@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flower Shop Chatbot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="chat-container">
+
+  <div class="chat-header">
+    <h2>Flower Shop Assistant</h2>
+    <p>Ask me about sales, stock, or orders</p>
+  </div>
+
+  <div class="chat-messages" id="chatMessages">
+    <div class="message bot">
+      <div class="avatar">🌸</div>
+      <div class="bubble">Hi! I'm your shop assistant.</div>
+    </div>
+  </div>
+
+  <div class="chat-input">
+    <input
+      type="text"
+      id="userInput"
+      placeholder="Type your question..."
+      autocomplete="off"
+    />
+    <button id="sendBtn" onclick="sendMessage()">Send</button>
+  </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
