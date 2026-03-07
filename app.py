@@ -1,27 +1,16 @@
 import os
 from dotenv import load_dotenv
-import torch
-from flask import Flask , render_template , jsonify , request
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, jsonify, request
+from database import db
+from models import Flower, Customer, Order
+from sqlalchemy import text as sa_text
 
 load_dotenv()
-
-tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
-model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-medium")
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 
-db = SQLAlchemy(app)
-
-class Flower(db.Model):
-    __tablename__ = 'flowers'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(80), nullable=False)
-    price = db.Column(db.String(80), nullable=False)
-    sold_quantity = db.Column(db.String(80), nullable=False)
-    sale_price = db.Column(db.String(80), nullable=False)
+db.init_app(app)   
 
 with app.app_context():
     db.create_all()
@@ -30,55 +19,60 @@ with app.app_context():
 def home():
     return render_template("home.html")
 
-
 @app.route("/chat", methods=["POST"])
 def chat():
     user_message = request.json["message"]
-    reply = get_chat_response(user_message) #"this is bot reply" 
+    reply = "hello" #get_chat_response(user_message)
     return jsonify({"reply": reply})
 
-def get_chat_response(text):
-    chat_history_ids = None
-    # Let's chat for 5 lines
-    for step in range(5):
-        # encode the new user input, add the eos_token and return a tensor in Pytorch
-        new_user_input_ids = tokenizer.encode(str(text) + tokenizer.eos_token, return_tensors='pt')
+@app.route("/report", methods=["GET"])
+def report():
+    flowers       = Flower.query.all()
+    total_revenue = sum(o.total_price for o in Order.query.all())
+    top_flower    = db.session.execute(sa_text("""
+        SELECT flowers.name, SUM(orders.quantity) as total
+        FROM flowers
+        JOIN orders ON flowers.id = orders.flower_id
+        GROUP BY flowers.name
+        ORDER BY total DESC
+        LIMIT 1
+    """)).fetchone()
 
-        # append the new user input tokens to the chat history
-        bot_input_ids = torch.cat([chat_history_ids, new_user_input_ids], dim=-1) if step > 0 else new_user_input_ids
-
-        # generated a response while limiting the total chat history to 1000 tokens, 
-        chat_history_ids = model.generate(bot_input_ids, max_length=1000, pad_token_id=tokenizer.eos_token_id)
-
-        # pretty print last ouput tokens from bot
-        return tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True)
-
-@app.route("/flowers")
-def flowers():
-    flowers = Flower.query.all()
-    flower_list = []
-    for flower in flowers:
-        flower_list.append({
-            "id": flower.id,
-            "name": flower.name,
-            "price": flower.price,
-            "sold_quantity": flower.sold_quantity,
-            "sale_price": flower.sale_price
-        })
-    return jsonify(flower_list)
+    return jsonify({
+        "total_flowers":      len(flowers),
+        "total_revenue":      round(total_revenue, 2),
+        "top_selling_flower": top_flower[0] if top_flower else "N/A",
+        "flowers": [{"name": f.name, "quantity": f.quantity, "price": f.price} for f in flowers]
+    })
 
 @app.route("/add_flower", methods=["POST"])
 def add_flower():
-    data = request.get_json()
-    new_flower = Flower(
-        name=data["name"],
-        price=data["price"],
-        sold_quantity=data["sold_quantity"],
-        sale_price=data["sale_price"]
-    )
+    data       = request.get_json()
+    new_flower = Flower(name=data["name"], quantity=data["quantity"], price=data["price"])
     db.session.add(new_flower)
     db.session.commit()
-    return jsonify({"message": "Flower added successfully!"}) , 201
+    return jsonify({"message": "Flower added successfully!"}), 201
+
+@app.route("/add_order", methods=["POST"])
+def add_order():
+    data      = request.get_json()
+    new_order = Order(
+        customer_id=data["customer_id"],
+        flower_id=data["flower_id"],
+        quantity=data["quantity"],
+        total_price=data["total_price"]
+    )
+    db.session.add(new_order)
+    db.session.commit()
+    return jsonify({"message": "Order recorded!"}), 201
+
+@app.route("/add_customer", methods=["POST"])
+def add_customer():
+    data         = request.get_json()
+    new_customer = Customer(name=data["name"], email=data["email"], phone=data["phone"])
+    db.session.add(new_customer)
+    db.session.commit()
+    return jsonify({"message": "Customer added successfully!"}), 201
 
 if __name__ == "__main__":
     app.run(debug=True)
