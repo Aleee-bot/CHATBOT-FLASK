@@ -4,12 +4,12 @@ from flask import Flask, render_template, jsonify, request
 from database import db
 from models import Flower, Customer, Order
 from sqlalchemy import text as sa_text
+from chatbot import get_chat_response
 
 load_dotenv()
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
-
 db.init_app(app)   
 
 with app.app_context():
@@ -19,11 +19,13 @@ with app.app_context():
 def home():
     return render_template("home.html")
 
+
 @app.route("/chat", methods=["POST"])
 def chat():
     user_message = request.json["message"]
-    reply = "hello" #get_chat_response(user_message)
+    reply = get_chat_response(user_message)
     return jsonify({"reply": reply})
+
 
 @app.route("/report", methods=["GET"])
 def report():
@@ -45,6 +47,7 @@ def report():
         "flowers": [{"name": f.name, "quantity": f.quantity, "price": f.price} for f in flowers]
     })
 
+
 @app.route("/add_flower", methods=["POST"])
 def add_flower():
     data       = request.get_json()
@@ -52,6 +55,7 @@ def add_flower():
     db.session.add(new_flower)
     db.session.commit()
     return jsonify({"message": "Flower added successfully!"}), 201
+
 
 @app.route("/add_order", methods=["POST"])
 def add_order():
@@ -66,6 +70,7 @@ def add_order():
     db.session.commit()
     return jsonify({"message": "Order recorded!"}), 201
 
+
 @app.route("/add_customer", methods=["POST"])
 def add_customer():
     data         = request.get_json()
@@ -73,6 +78,7 @@ def add_customer():
     db.session.add(new_customer)
     db.session.commit()
     return jsonify({"message": "Customer added successfully!"}), 201
+
 
 if __name__ == "__main__":
     app.run(debug=True)
